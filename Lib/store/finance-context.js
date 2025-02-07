@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect, createContext } from "react";
+import { useState, useEffect, createContext, useContext } from "react";
+
+import { authContext } from "./auth-context";
 
 // firebase
 import { db } from "@/Lib/firebase";
@@ -11,6 +13,8 @@ import {
   doc,
   deleteDoc,
   updateDoc,
+  query,
+  where,
 } from "firebase/firestore";
 
 export const financeContext = createContext({
@@ -28,11 +32,14 @@ export default function financeContextProvider({ children }) {
   const [income, setIncome] = useState([]);
   const [expenses, setExpenses] = useState([]);
 
+  const { user } = useContext(authContext);
+
   const addCategory = async (category) => {
     try {
       const collectionRef = collection(db, "expenses");
 
       const docSnap = await addDoc(collectionRef, {
+        uid: user.uid,
         ...category,
         items: [],
       });
@@ -42,6 +49,7 @@ export default function financeContextProvider({ children }) {
           ...prevExpenses,
           {
             id: docSnap.id,
+            uid: user.uid,
             items: [],
             ...category,
           },
@@ -164,9 +172,13 @@ export default function financeContextProvider({ children }) {
 
   // useEffect function cannot be async, add a function inside instead
   useEffect(() => {
+    if (!user) return;
+
     const getIncomeData = async () => {
       const collectionRef = collection(db, "income");
-      const docsSnap = await getDocs(collectionRef);
+      const q = query(collectionRef, where("uid", "==", user.uid));
+
+      const docsSnap = await getDocs(q);
 
       const data = docsSnap.docs.map((doc) => {
         return {
@@ -181,7 +193,9 @@ export default function financeContextProvider({ children }) {
 
     const getExpensesData = async () => {
       const collectionRef = collection(db, "expenses");
-      const docsSnap = await getDocs(collectionRef);
+      const q = query(collectionRef, where("uid", "==", user.uid));
+
+      const docsSnap = await getDocs(q);
 
       const data = docsSnap.docs.map((doc) => {
         return {
@@ -195,7 +209,7 @@ export default function financeContextProvider({ children }) {
 
     getIncomeData();
     getExpensesData();
-  }, []);
+  }, [user]);
 
   return (
     <financeContext.Provider value={values}>{children}</financeContext.Provider>
